@@ -1,0 +1,126 @@
+name: Publicar versión
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'   # Se dispara con tags tipo v1.0.0, v1.2.3, etc.
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Clonar repo (en el tag vX.Y.Z)
+        uses: actions/checkout@v4
+
+      - name: Instalar 7-Zip
+        run: sudo apt-get update && sudo apt-get install -y p7zip-full
+
+      # Lee `lang_code` desde lang/settings.json. El mismo workflow funciona
+      # tanto en LetraDelta (lang_code=es_mx) como en LetraDelta-EN (lang_code=en),
+      # sin que ninguno tenga que tener su código fijado a mano en el .yml.
+      - name: Detectar lang_code desde settings.json
+        id: langcode
+        run: |
+          LANG_CODE=$(jq -r '.lang_code // empty' lang/settings.json)
+          if [ -z "$LANG_CODE" ]; then
+            echo "::error::No se encontró lang_code en lang/settings.json"
+            exit 1
+          fi
+          echo "code=$LANG_CODE" >> "$GITHUB_OUTPUT"
+          echo "Detectado lang_code='$LANG_CODE'"
+
+      # El instalador descarga este .7z y lo extrae sobre la carpeta del juego.
+      # La estructura `lang/<code>/...` es OBLIGATORIA para que dos paquetes
+      # de idioma distintos puedan coexistir sin pisarse: aquí el repo tiene
+      # los archivos en `lang/` directo (más limpio para editar y para que el
+      # `files_url` apunte a `.../main/lang/`), pero a la hora de empaquetar
+      # los reorganizamos bajo `lang/<code>/`.
+      - name: Generar lang.7z (estructura multi-idioma para el instalador)
+        run: |
+          LANG_CODE=${{ steps.langcode.outputs.code }}
+          mkdir -p staging/lang/$LANG_CODE
+          cp -a lang/. staging/lang/$LANG_CODE/
+          (cd staging && 7z a -t7z -mx=9 ../lang.7z lang/)
+
+      # El .zip es para quien prefiera descargar y arrastrar a la carpeta del
+      # juego sin pasar por el instalador. Se deja plano: el contenido va bajo
+      # `lang/` directo, sin subcarpeta de código. Es suficiente cuando solo
+      # se quiere un idioma; si ya había otro idioma instalado, este lo pisa.
+      # (Para coexistencia de varios, hay que usar el instalador con el .7z.)
+      - name: Generar lang.zip (descarga directa al juego)
+        run: |
+          zip -r lang.zip lang/
+
+      - name: Extraer descripción de la versión desde changes.json
+        id: changelog
+        env:
+          VERSION_TAG: ${{ github.ref_name }}
+        run: |
+          VERSION="${VERSION_TAG#v}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+          VERSION="$VERSION" python3 <<'PY' > changelog.md
+          import json, os, sys
+          version = os.environ["VERSION"]
+          with open("lang/changes.json", encoding="utf-8") as f:
+              data = json.load(f)
+          entry = data.get(version)
+          if not entry:
+              sys.exit(f"No hay entrada para la versión {version} en changes.json")
+          print(entry.get("description", ""))
+          PY
+
+      - name: Publicar versión vX.Y.Z (con lang.7z, lang.zip y descripción)
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --title "Versión ${{ steps.changelog.outputs.version }}" \
+            --notes-file changelog.md \
+            --latest \
+            lang.7z lang.zip
+
+      - name: Mover el tag 'latest' a este commit
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git tag -f latest
+          git push -f origin latest
+
+      # La publicación 'Latest' es flotante: siempre apunta al último tag.
+      # Sirve para que el instalador y la documentación tengan una URL de
+      # descarga estable, sin tener que actualizarla cada vez que se publica
+      # una nueva versión.
+      - name: Refrescar la publicación 'Latest' (URLs de descarga estables)
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          VERSION_TAG: ${{ github.ref_name }}
+        run: |
+          NOTES="Contiene siempre los archivos de la versión más reciente.
+
+          - \`lang.7z\` — usado por el instalador automático (estructura multi-idioma).
+          - \`lang.zip\` — para descomprimir directamente sobre la carpeta del juego (un solo idioma).
+
+          **Versión actual:** [\`$VERSION_TAG\`](https://github.com/$GITHUB_REPOSITORY/releases/tag/$VERSION_TAG)
+
+          La descripción de cada versión está en su publicación correspondiente."
+
+          if gh release view latest >/dev/null 2>&1; then
+            gh release edit latest --notes "$NOTES"
+            gh release upload latest lang.7z lang.zip --clobber
+          else
+            gh release create latest \
+              --title "Latest" \
+              --notes "$NOTES" \
+              --latest=false \
+              lang.7z lang.zip
+          fi
