@@ -1,6 +1,6 @@
 # DELTARUNE · Pack de idioma inglés
 
-Pack de idioma inglés para el mod [*Deltranslate*](https://github.com/Neprim/Deltranslate) de Neprim, distribuido como complemento del proyecto [*LetraDelta*](https://github.com/BroxiCoros/LetraDelta) (traducción al español americano de *DELTARUNE*).
+Pack de idioma inglés para el mod [*Deltranslate*](https://github.com/Lazy-Desman/DeltranslatePatch) de Neprim, distribuido como complemento del proyecto [*LetraDelta*](https://github.com/BroxiCoros/LetraDelta) (traducción al español americano de *DELTARUNE*).
 
 Este repositorio existe por un motivo concreto. *Deltranslate*, en su modo multi-idioma, sustituye los textos del juego por los del paquete de idioma activo en lugar de leerlos del `data.win`. Al instalar la traducción al español, el inglés original deja de estar disponible si no se incluye también un paquete que lo contenga. *LetraDelta-EN* cumple esa función: conserva los textos en inglés tal como aparecen en el juego original, organizados según la estructura que el mod espera.
 
@@ -12,7 +12,7 @@ El contenido se basa en el [*EngDeltranslatePack*](https://github.com/Lazy-Desma
 
 ## Para qué sirve este repositorio
 
-En la práctica, los jugadores de *LetraDelta* no instalan este paquete por su cuenta. El [instalador automático](https://github.com/BroxiCoros/LetraDeltaInstaller) lo descarga junto con el pack de español, de modo que el juego termina con los dos idiomas disponibles y se puede alternar entre ellos desde el menú interno del mod.
+En la práctica, los jugadores de *LetraDelta* no instalan este paquete por su cuenta. El [instalador automático](https://github.com/BroxiCoros/InstaladorLetraDelta) lo descarga junto con el pack de español, de modo que el juego termina con los dos idiomas disponibles y se puede alternar entre ellos desde el menú interno del mod.
 
 El repositorio se mantiene aparte, en lugar de incluir el inglés dentro de [`LetraDelta`](https://github.com/BroxiCoros/LetraDelta), por dos razones:
 
