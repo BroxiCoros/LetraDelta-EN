@@ -1,4 +1,14 @@
 {
+    "5.0.1": {
+        "description": "- Capítulo 5.",
+        "files": [
+            "chapter2/strings.json",
+            "chapter3/strings.json",
+            "chapter4/strings.json",
+            "chapter5/strings.json",
+            "strings.json"
+        ]
+    },
     "1.0.4": {
         "description": "- Patch 1.04",
         "files": []
