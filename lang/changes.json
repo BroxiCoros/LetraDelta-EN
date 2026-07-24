@@ -1,4 +1,11 @@
 {
+    "5.0.3": {
+        "description": "- Correcciones en créditos.",
+        "files": [
+            "chapter5/strings.json",
+            "fonts/fnt_8bit_chapter4.ttf"
+        ]
+    },
     "5.0.2": {
         "description": "- Nuevos diálogos.",
         "files": [
