@@ -79,15 +79,6 @@ jobs:
           print(entry.get("description", ""))
           PY
 
-      - name: Publicar versión vX.Y.Z (con lang.7z, lang.zip y descripción)
-        if: startsWith(github.ref, 'refs/tags/v')
-        run: |
-          gh release create "$GITHUB_REF_NAME" \
-            --title "Versión ${{ steps.changelog.outputs.version }}" \
-            --notes-file changelog.md \
-            --latest \
-            lang.7z lang.zip
-
       - name: Mover el tag 'latest' a este commit
         if: startsWith(github.ref, 'refs/tags/v')
         run: |
@@ -96,31 +87,36 @@ jobs:
           git tag -f latest
           git push -f origin latest
 
-      # La publicación 'Latest' es flotante: siempre apunta al último tag.
-      # Sirve para que el instalador y la documentación tengan una URL de
-      # descarga estable, sin tener que actualizarla cada vez que se publica
-      # una nueva versión.
+      # 'Latest' es la única publicación del repositorio: flotante, siempre
+      # apuntando al último tag. Así el instalador y la documentación tienen
+      # una URL de descarga estable, y la página de publicaciones no acumula
+      # una entrada por cada versión (se publican varias al día). El historial
+      # de versiones vive en lang/changes.json y en los tags de git.
       - name: Refrescar la publicación 'Latest' (URLs de descarga estables)
         if: startsWith(github.ref, 'refs/tags/v')
         env:
-          VERSION_TAG: ${{ github.ref_name }}
+          VERSION: ${{ steps.changelog.outputs.version }}
         run: |
-          NOTES="Contiene siempre los archivos de la versión más reciente.
-
-          - \`lang.7z\` — usado por el instalador automático (estructura multi-idioma).
-          - \`lang.zip\` — para descomprimir directamente sobre la carpeta del juego (un solo idioma).
-
-          **Versión actual:** [\`$VERSION_TAG\`](https://github.com/$GITHUB_REPOSITORY/releases/tag/$VERSION_TAG)
-
-          La descripción de cada versión está en su publicación correspondiente."
+          {
+            echo "**Versión actual:** \`$VERSION\`"
+            echo
+            cat changelog.md
+            echo
+            echo "---"
+            echo
+            echo "- \`lang.7z\` — usado por el instalador automático (estructura multi-idioma)."
+            echo "- \`lang.zip\` — para descomprimir directamente sobre la carpeta del juego (un solo idioma)."
+            echo
+            echo "El registro de todas las versiones está en \`lang/changes.json\`."
+          } > notas.md
 
           if gh release view latest >/dev/null 2>&1; then
-            gh release edit latest --notes "$NOTES"
+            gh release edit latest --title "Latest" --notes-file notas.md --latest
             gh release upload latest lang.7z lang.zip --clobber
           else
             gh release create latest \
               --title "Latest" \
-              --notes "$NOTES" \
-              --latest=false \
+              --notes-file notas.md \
+              --latest \
               lang.7z lang.zip
           fi
