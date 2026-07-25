@@ -60,27 +60,49 @@ jobs:
         run: |
           zip -r lang.zip lang/
 
-      - name: Extraer descripción de la versión desde changes.json
+      - name: Extraer versión y descripción desde changes.json
         id: changelog
         env:
-          VERSION_TAG: ${{ github.ref_name }}
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
         run: |
-          VERSION="${VERSION_TAG#v}"
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-
-          VERSION="$VERSION" python3 <<'PY' > changelog.md
+          python3 <<'PY' > changelog.md
           import json, os, sys
-          version = os.environ["VERSION"]
+
           with open("lang/changes.json", encoding="utf-8") as f:
               data = json.load(f)
+
+          def semver(v):
+              """(mayor, menor, parche) si `v` es X.Y.Z numérico; si no, None."""
+              try:
+                  mayor, menor, parche = (int(p) for p in v.split("."))
+              except ValueError:
+                  return None
+              return (mayor, menor, parche)
+
+          if os.environ["REF_TYPE"] == "tag":
+              version = os.environ["REF_NAME"].removeprefix("v")
+          else:
+              # Lanzado a mano (workflow_dispatch): no hay tag del que sacar la
+              # versión, así que se toma la más alta de changes.json. Ojo: se
+              # publica el estado actual de la rama, que puede ir por delante
+              # del último tag.
+              validas = [k for k in data if semver(k)]
+              if not validas:
+                  sys.exit("changes.json no tiene ninguna versión X.Y.Z válida")
+              version = max(validas, key=semver)
+
           entry = data.get(version)
           if not entry:
               sys.exit(f"No hay entrada para la versión {version} en changes.json")
+
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as out:
+              out.write(f"version={version}\n")
+
           print(entry.get("description", ""))
           PY
 
       - name: Mover el tag 'latest' a este commit
-        if: startsWith(github.ref, 'refs/tags/v')
         run: |
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git config user.name "github-actions[bot]"
@@ -93,7 +115,6 @@ jobs:
       # una entrada por cada versión (se publican varias al día). El historial
       # de versiones vive en lang/changes.json y en los tags de git.
       - name: Refrescar la publicación 'Latest' (URLs de descarga estables)
-        if: startsWith(github.ref, 'refs/tags/v')
         env:
           VERSION: ${{ steps.changelog.outputs.version }}
         run: |
