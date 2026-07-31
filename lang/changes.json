@@ -1,4 +1,12 @@
 {
+    "5.0.5": {
+        "description": "- Actualización a v0.0.253.",
+        "files": [
+            "chapter3/strings.json",
+            "chapter4/strings.json",
+            "chapter5/strings.json"
+        ]
+    },
     "5.0.4": {
         "description": "- Corregir enlace.",
         "files": [
